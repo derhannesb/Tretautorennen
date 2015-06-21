@@ -26,6 +26,11 @@ func _fixed_process(delta):
 	
 	if (Input.is_action_pressed("pedal_down")):
 		force = max_force
+		
+	if (Input.is_action_pressed("pedal_backwards")):
+		get_node("Reifen_HR").set_rotation(Vector3(0,-180,0))
+		get_node("Reifen_HL").set_rotation(Vector3(0,-180,0))
+		force = max_force
 	
 	if (force > 0):
 		force-=1
