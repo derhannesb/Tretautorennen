@@ -1,6 +1,5 @@
 extends VehicleBody
 
-var timer = 0
 var force = 0
 var max_force = 100
 var anim_player = null
@@ -26,33 +25,46 @@ func _ready():
 	
 func _fixed_process(delta):
 	set_engine_force(force)
-	timer += delta
 	
-	current_pos = Vector3(get_translation().x, 0.0, get_translation().z)
-	#var distance_to_checkpoint = current_pos.distance_to(next_checkpoint)
-	var distance_to_checkpoint = Vector2(current_pos.x, current_pos.z).distance_to(Vector2(next_checkpoint.x, next_checkpoint.z))
+	# Get global Player Position and rotation
+	var player_position = get_global_transform().origin
+	var player_direction = (get_global_transform().basis * Vector3(0,0,1)).normalized()
+	player_direction.y = 0
+	# Get vector pointing to next checkpoint
+	var direction_to_cp = (next_checkpoint - player_position).normalized()
+	direction_to_cp.y = 0
+	# Get Matrices rotating to rotate that vector
+	var rotation_matrix = Matrix3()
+	var rotation_matrix_left = rotation_matrix.rotated(Vector3(0, 1, 0), deg2rad(5))
+	var rotation_matrix_right = rotation_matrix.rotated(Vector3(0, 1, 0), deg2rad(-5))
+	# Get vectors pointing a bit left and right to calculate where you need to steer
+	var dir_to_cp_left = rotation_matrix_left * direction_to_cp
+	var dir_to_cp_right = rotation_matrix_right * direction_to_cp
+	# dots = 1 if facing at cp, dots = 0 if perpendicular to cp, dots = -1 if cp straight behind
+	var vector_dot = player_direction.dot(direction_to_cp)
+	var vector_dot_left = player_direction.dot(dir_to_cp_left)
+	var vector_dot_right = player_direction.dot(dir_to_cp_right)
 	
-	if (distance_to_checkpoint < 3):
-		print("-> Waypoint reached.")
-		checkPointIndex = checkPointIndex + 1
+	# Check if a checkpoint has been reached
+	if (player_position.distance_to(next_checkpoint) < 5):
+		# Are there checkpoints left?
+		if checkPointIndex < strecke.get_curve().get_point_count()-1:
+			checkPointIndex += 1
+		# Else: Next round!
+		else:
+			checkPointIndex = 0
 		next_checkpoint = Vector3(strecke.get_curve().get_point_pos(checkPointIndex).x, 0.0, strecke.get_curve().get_point_pos(checkPointIndex).z)
-		print("--> Next Waypoint: X: " + str(next_checkpoint.x) + " Z: " + str(next_checkpoint.z))
 	
-	angle_to_next_checkpoint = Vector2(current_pos.x, current_pos.z).angle_to(Vector2(next_checkpoint.x, next_checkpoint.z))
-	
-	if timer > 1:
-		print("Distance to waypoint: " + str(distance_to_checkpoint))
-		print("  Angle to waypoint: " + str(angle_to_next_checkpoint))
-		print("  My angle: " + str(get_rotation().y))
-		timer = 0
-	
-	#if (abs(get_rotation().y - angle_to_next_checkpoint) > 0.5):
-	if (get_rotation().y < angle_to_next_checkpoint and get_steering() > -steer_max):
-		set_steering(get_steering()-steer_inc)
-		mesh_lenkrad.rotate(Vector3(0,1,0), -steer_inc)
-	elif (get_rotation().y > angle_to_next_checkpoint and get_steering() < steer_max):
-		set_steering(get_steering()+steer_inc)
-		mesh_lenkrad.rotate(Vector3(0,1,0), steer_inc)
+	# Check if you are not facing somewhere near the checkpoint
+	if (vector_dot < 0.9):
+		# Check in what direction you need to steer
+		if (vector_dot_left > vector_dot_right and get_steering() > -steer_max):
+			set_steering(get_steering()-steer_inc)
+			mesh_lenkrad.rotate(Vector3(0,1,0), -steer_inc)
+		elif (vector_dot_right > vector_dot_left and get_steering() < steer_max):
+			set_steering(get_steering()+steer_inc)
+			mesh_lenkrad.rotate(Vector3(0,1,0), steer_inc)
+	# Were driving towards the checkpoint, stay that way!
 	else:
 		set_steering(0)
 	
